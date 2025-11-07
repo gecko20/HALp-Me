@@ -14,6 +14,7 @@ from importlib import import_module
 cli_parser = argparse.ArgumentParser()
 cli_parser.add_argument("prompt", help="The prompt being sent to the underlying LLM")
 cli_parser.add_argument("-v", "--verbose", help="Enable verbose output", action="store_true")
+cli_parser.add_argument("-w", "--working-directory", help="The working directory to use", default="./calculator")
 
 # Load environment vars
 load_dotenv()
@@ -52,16 +53,15 @@ messages: list[types.Content] = []
 
 
 # Calls a function for the LLM
-def call_function(function_call_part, verbose=False):
+def call_function(function_call_part, working_directory="./calculator", verbose=False):
     if verbose:
         print(f"Calling function: {function_call_part.name}({function_call_part.args})")
     else:
         print(f" - Calling function: {function_call_part.name}")
 
     # Inject the working directory into the function call's args
-    # TODO: Turn the working directory either into an argument for this program or retrieve it here
     args = function_call_part.args.copy()
-    args['working_directory'] = './calculator'
+    args['working_directory'] = working_directory
 
     # Get the function via introspection / reflection
     module = import_module(f"functions.{function_call_part.name}")
@@ -94,6 +94,7 @@ def main():
     args = cli_parser.parse_args()
 
     prompt = args.prompt
+    working_directory = args.working_directory
 
     messages.append(
         types.Content(role="user", parts=[types.Part(text=prompt)])
@@ -126,13 +127,13 @@ def main():
             # Check whether the current response returned the response.text property;
             # if it did, break out of the feedback loop.
             # The first iteration should yield the LLM's plan.
-            if "Job's done." in response.text:
+            if response.text and "Job's done." in response.text:
                 final_response = response
                 break
 
             if response.function_calls:
                 for call in response.function_calls:
-                    result = call_function(call, verbose=args.verbose)
+                    result = call_function(call, working_directory=working_directory, verbose=args.verbose)
                     if not result.parts[0].function_response.response:
                         raise Exception(f"Fatal: A call to {call.name} failed")
 
