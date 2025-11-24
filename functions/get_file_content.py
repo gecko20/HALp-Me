@@ -1,24 +1,11 @@
 import os
-from google.genai import types
+from  typing import Dict, Any
+from core.types import ToolSpec
 
-# TODO: Move to config file
 MAX_CHARS = 10000
 
-schema_get_file_content = types.FunctionDeclaration(
-    name="get_file_content",
-    description=f"Reads the content from the file located at the given file_path, constrained to the working directory, as a string truncated to {MAX_CHARS} characters.",
-    parameters=types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            "file_path": types.Schema(
-                type=types.Type.STRING,
-                description="The path to the file to read from, relative to the working directory. Required.",
-            ),
-        },
-    ),
-)
 
-def get_file_content(working_directory, file_path):
+def get_file_content(working_directory: str, file_path: str) -> str:
     working_directory_abs = os.path.abspath(working_directory)
 
     if not os.path.isabs(file_path):
@@ -39,3 +26,26 @@ def get_file_content(working_directory, file_path):
             file_content_string += f'[...File "{file_path}" truncated at {MAX_CHARS} characters]'
 
         return file_content_string
+
+def build_tool(working_directory: str) -> ToolSpec:
+    def _fn(file_path: str) -> str:
+        return get_file_content(working_directory=working_directory, file_path=file_path)
+
+    schema: Dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "file_path": {
+                "type": "string",
+                "description": "The path to the file to read from, relative to the working directory. Required.",
+            }
+        },
+        "required": ["file_path"],
+        "additionalProperties": False
+    }
+
+    return ToolSpec(
+        name="get_file_content",
+        description=f"Reads the content from the file located at the given file_path, constrained to the working directory, as a string truncated to {MAX_CHARS} characters.",
+        parameters=schema,
+        func=_fn,
+    )

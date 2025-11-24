@@ -1,26 +1,10 @@
 import os
 import subprocess
-from google.genai import types
+from typing import List, Dict, Any
+from core.types import ToolSpec
 
-schema_run_python_file = types.FunctionDeclaration(
-    name="run_python_file",
-    description=f"Executes the Python file located at file_path, constrained to the working directory, passing the optional args to it.",
-    parameters=types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            "file_path": types.Schema(
-                type=types.Type.STRING,
-                description="The path to the Python file which will be executed, relative to the working directory. Required.",
-            ),
-            "args": types.Schema(
-                type=types.Type.STRING,
-                description="An optional list of arguments which are passed to the Python file. Defaults to [] if not specified."
-            )
-        },
-    ),
-)
 
-def run_python_file(working_directory, file_path, args=[]):
+def run_python_file(working_directory: str, file_path: str, args: List[str]=[]) -> str:
     working_directory_abs = os.path.abspath(working_directory)
 
     if not os.path.isabs(file_path):
@@ -57,3 +41,30 @@ def run_python_file(working_directory, file_path, args=[]):
         return return_string
     except Exception as e:
         return f'Error: executing Python file: {e}'
+
+def build_tool(working_directory: str) -> ToolSpec:
+    def _fn(file_path: str, args: List[str]=[]) -> str:
+        return run_python_file(working_directory=working_directory, file_path=file_path, args=args)
+
+    schema: Dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "file_path": {
+                "type": "string",
+                "description": "The path to the Python file which will be executed, relative to the working directory. Required.",
+            },
+            "args": {
+                "type": "string",
+                "description": "An optional list of arguments which are passed to the Python file. Defaults to [] if not specified.",
+            }
+        },
+        "required": ["file_path"],
+        "additionalProperties": False,
+    }
+
+    return ToolSpec(
+        name="run_python_file",
+        description="Executes the Python file located at file_path, constrained to the working directory, passing the optional args to it.",
+        parameters=schema,
+        func=_fn,
+    )

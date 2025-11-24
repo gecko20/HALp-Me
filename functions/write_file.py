@@ -1,25 +1,9 @@
 import os
-from google.genai import types
+from typing import Dict, Any
+from core.types import ToolSpec
 
-schema_write_file = types.FunctionDeclaration(
-    name="write_file",
-    description=f"Writes the given content to a file located at file_path, constrained to the working directory, overwriting existing contents of the file.",
-    parameters=types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            "file_path": types.Schema(
-                type=types.Type.STRING,
-                description="The path to the file to write to, relative to the working directory. Required.",
-            ),
-            "content": types.Schema(
-                type=types.Type.STRING,
-                description="The content to write to the file. Required."
-            )
-        },
-    ),
-)
 
-def write_file(working_directory, file_path, content):
+def write_file(working_directory: str, file_path: str, content: str) -> str:
     working_directory_abs = os.path.abspath(working_directory)
 
     if not os.path.isabs(file_path):
@@ -42,3 +26,30 @@ def write_file(working_directory, file_path, content):
         f.write(content)
 
         return f'Successfully wrote to "{file_path}" ({len(content)} characters written)'
+
+def build_tool(working_directory: str) -> ToolSpec:
+    def _fn(file_path: str, content: str) -> str:
+        return write_file(working_directory=working_directory, file_path=file_path, content=content)
+
+    schema: Dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "file_path": {
+                "type": "string",
+                "description": "The path to the file to write to, relative to the working directory. Required.",
+            },
+            "content": {
+                "type": "string",
+                "description": "The content to write to the file. Required.",
+            }
+        },
+        "required": ["file_path", "content"],
+        "additionalProperties": False
+    }
+
+    return ToolSpec(
+        name="write_file",
+        description="Writes the given content to a file located at file_path, constrained to the working directory, overwriting existing contents of the file.",
+        parameters=schema,
+        func=_fn,
+    )
